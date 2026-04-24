@@ -528,6 +528,9 @@ class CMDBSource
 
 	/**
 	 * @param string $sSQLQuery
+	 * @param array $aParams An optional list array with as many elements as
+	 *  there are bound parameters in the SQL statement being executed.
+	 *  Each value is treated as a string.
 	 *
 	 * @return mysqli_result|null
 	 * @throws MySQLException
@@ -535,7 +538,7 @@ class CMDBSource
 	 *
 	 * @since 2.7.0 N°679 handles nested transactions
 	 */
-	public static function Query($sSQLQuery)
+	public static function Query($sSQLQuery, array $aParams = [])
 	{
 		if (preg_match('/^START TRANSACTION;?$/i', $sSQLQuery)) {
 			self::StartTransaction();
@@ -553,7 +556,7 @@ class CMDBSource
 			return null;
 		}
 
-		return self::DBQuery($sSQLQuery);
+		return self::DBQuery($sSQLQuery, $aParams);
 	}
 
 	/**
@@ -564,6 +567,9 @@ class CMDBSource
 	 * @internal
 	 *
 	 * @param string $sSql
+	 * @param array $aParams An optional list array with as many elements as
+	 *  there are bound parameters in the SQL statement being executed.
+	 *  Each value is treated as a string.
 	 *
 	 * @return bool|\mysqli_result
 	 * @throws \MySQLHasGoneAwayException
@@ -571,7 +577,7 @@ class CMDBSource
 	 *
 	 * @since 2.7.0 N°679
 	 */
-	private static function DBQuery($sSql)
+	private static function DBQuery($sSql, array $aParams = [])
 	{
 		$sShortSQL = substr(preg_replace("/\s+/", " ", substr($sSql, 0, 180)), 0, 150);
 		if (substr_compare($sShortSQL, "SELECT", 0, strlen("SELECT")) !== 0) {
@@ -580,8 +586,12 @@ class CMDBSource
 
 		$oKPI = new ExecutionKPI();
 		try {
-			/** @noinspection NullPointerExceptionInspection this shouldn't be called with un-init DB */
-			$oResult = DbConnectionWrapper::GetDbConnection(true)->query($sSql);
+			if (empty($aParams)) {
+				/** @noinspection NullPointerExceptionInspection this shouldn't be called with un-init DB */
+				$oResult = DbConnectionWrapper::GetDbConnection(true)->query($sSql);
+			} else {
+				$oResult = DbConnectionWrapper::GetDbConnection(true)->execute_query($sSql, $aParams);
+			}
 		} catch (mysqli_sql_exception $e) {
 			self::LogDeadLock($e, true);
 			throw new MySQLException('Failed to issue SQL query', ['query' => $sSql, $e, 'stack' => $e->getTraceAsString()]);
